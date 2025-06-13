@@ -4,7 +4,7 @@ import { CreditCard, CheckCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWeb3 } from '../context/Web3Context';
 import { makePaymentWithCrypto } from '../utils/web3';
-import { processCardPayment } from '../utils/payments';
+import { useProcessCardPayment } from '../utils/payments';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import Container from '../components/ui/Container';
@@ -17,6 +17,7 @@ const CheckoutPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'crypto' | 'card'>('crypto');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Formatear precio
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -25,46 +26,51 @@ const CheckoutPage: React.FC = () => {
     }).format(price);
   };
 
+  // Custom hook para procesar pagos con tarjeta
+  const { processCardPayment } = useProcessCardPayment();
+
+  // Manejar el pago
   const handlePayment = async () => {
     if (!isConnected && paymentMethod === 'crypto') {
       await connectWallet();
       return;
     }
-
     setIsProcessing(true);
     try {
       if (paymentMethod === 'crypto') {
+        // Pago con criptomonedas
         const result = await makePaymentWithCrypto(getTotal() * 1.025);
         if (result.success) {
           clearCart();
-          navigate('/checkout/success', { 
-            state: { 
+          navigate('/checkout/success', {
+            state: {
               transactionHash: result.transactionHash,
-              paymentMethod: 'crypto'
-            }
+              paymentMethod: 'crypto',
+            },
           });
         }
       } else {
-        // Handle card/PayPal payment
+        // Pago con tarjeta (Stripe)
         const result = await processCardPayment(getTotal() * 1.025);
         if (result.success) {
           clearCart();
           navigate('/checkout/success', {
             state: {
               paymentId: result.paymentIntentId,
-              paymentMethod: 'card'
-            }
+              paymentMethod: 'card',
+            },
           });
         }
       }
     } catch (error) {
       console.error('Payment failed:', error);
-      // Handle error (show error message to user)
+      // Mostrar mensaje de error al usuario
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Si el carrito está vacío
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -77,10 +83,7 @@ const CheckoutPage: React.FC = () => {
             <p className="text-slate-600 dark:text-slate-300 mb-8">
               Add some properties to your cart to proceed with checkout
             </p>
-            <Button
-              variant="primary"
-              onClick={() => navigate('/properties')}
-            >
+            <Button variant="primary" onClick={() => navigate('/properties')}>
               Browse Properties
             </Button>
           </div>
@@ -95,23 +98,17 @@ const CheckoutPage: React.FC = () => {
       <Navbar />
       <Container className="py-16">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-8">
-            Checkout
-          </h1>
-
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-8">Checkout</h1>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Resumen del pedido */}
             <div className="md:col-span-2 space-y-8">
-              {/* Order Summary */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
                   Order Summary
                 </h2>
                 <div className="space-y-4">
                   {items.map((item) => (
-                    <div
-                      key={item.property.id}
-                      className="flex items-start space-x-4"
-                    >
+                    <div key={item.property.id} className="flex items-start space-x-4">
                       <img
                         src={item.property.imageUrl}
                         alt={item.property.title}
@@ -122,7 +119,9 @@ const CheckoutPage: React.FC = () => {
                           {item.property.title}
                         </h3>
                         <p className="text-sm text-slate-600 dark:text-slate-300">
-                          {item.type === 'purchase' ? 'Purchase' : `Rent (${item.duration || 1} month${item.duration !== 1 ? 's' : ''})`}
+                          {item.type === 'purchase'
+                            ? 'Purchase'
+                            : `Rent (${item.duration || 1} month${item.duration !== 1 ? 's' : ''})`}
                         </p>
                         <p className="text-teal-600 dark:text-teal-400 font-medium">
                           {formatPrice(item.property.price)}
@@ -133,8 +132,7 @@ const CheckoutPage: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Payment Method */}
+              {/* Método de pago */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
                   Payment Method
@@ -161,7 +159,6 @@ const CheckoutPage: React.FC = () => {
                       <CheckCircle className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                     )}
                   </button>
-
                   <button
                     onClick={() => setPaymentMethod('card')}
                     className={`w-full flex items-center p-4 border rounded-lg ${
@@ -186,8 +183,7 @@ const CheckoutPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Order Total */}
+            {/* Total del pedido */}
             <div className="md:col-span-1">
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 sticky top-24">
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
@@ -209,7 +205,6 @@ const CheckoutPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
                 <Button
                   variant="primary"
                   fullWidth
@@ -219,11 +214,11 @@ const CheckoutPage: React.FC = () => {
                   {isProcessing ? (
                     <span className="flex items-center">
                       <svg
-  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-  xmlns="http://www.w3.org/2000/svg"
-  fill="none"
-  viewBox="0 0 24 24"
->
+                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
                         <circle
                           className="opacity-25"
                           cx="12"
